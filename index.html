@@ -263,6 +263,36 @@
     #logout-btn:hover { text-decoration: underline; }
 
     .hidden { display: none !important; }
+
+    /* ---- Liste sekmeleri (İcra / Mahkeme / Duruşmalar) ---- */
+    .list-tabs {
+      display: flex;
+      border-bottom: 1px solid #eee;
+    }
+
+    .list-tab {
+      flex: 1;
+      padding: 14px 6px;
+      border: none;
+      background: #fafafa;
+      color: #777;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      line-height: 1.3;
+    }
+
+    .list-tab:hover { background: #f0f0f5; }
+
+    .list-tab.active {
+      background: #fff;
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+
+    .list-tab .icon { display: block; font-size: 1.2rem; margin-bottom: 2px; }
   </style>
 </head>
 <body>
@@ -293,8 +323,20 @@
       <button id="logout-btn">Çıkış yap</button>
     </div>
 
+    <div class="list-tabs">
+      <button class="list-tab active" data-category="icra">
+        <span class="icon">⚖️</span>İcra Dairesi<br>İşleri
+      </button>
+      <button class="list-tab" data-category="mahkeme">
+        <span class="icon">🏛️</span>Mahkeme Kalemi<br>İşleri
+      </button>
+      <button class="list-tab" data-category="durusma">
+        <span class="icon">👨‍⚖️</span>Duruşmalar
+      </button>
+    </div>
+
     <div class="input-row">
-      <input type="text" id="task-input" placeholder="Yeni görev ekle..." maxlength="200">
+      <input type="text" id="task-input" placeholder="Yeni icra dairesi işi ekle..." maxlength="200">
       <button id="add-btn">Ekle</button>
     </div>
 
@@ -341,9 +383,11 @@
     const authMsg = document.getElementById('auth-msg');
     const logoutBtn = document.getElementById('logout-btn');
     const userEmail = document.getElementById('user-email');
+    const listTabs = document.querySelectorAll('.list-tab');
 
     let tasks = [];
     let filter = 'all';
+    let currentCategory = 'icra'; // aktif liste: icra | mahkeme | durusma
 
     // Veritabanından tüm görevleri çeker
     async function load() {
@@ -365,7 +409,7 @@
       const text = input.value.trim();
       if (!text) return;
 
-      const { error } = await db.from('tasks').insert({ text, done: false });
+      const { error } = await db.from('tasks').insert({ text, done: false, category: currentCategory });
       if (error) {
         alert('Görev eklenemedi: ' + error.message);
         console.error(error);
@@ -396,7 +440,7 @@
     }
 
     async function clearDone() {
-      const { error } = await db.from('tasks').delete().eq('done', true);
+      const { error } = await db.from('tasks').delete().eq('done', true).eq('category', currentCategory);
       if (error) {
         alert('Temizlenemedi: ' + error.message);
         console.error(error);
@@ -409,6 +453,7 @@
       list.innerHTML = '';
 
       const visible = tasks.filter(t => {
+        if (t.category !== currentCategory) return false;   // sadece aktif liste
         if (filter === 'active') return !t.done;
         if (filter === 'done') return t.done;
         return true;
@@ -443,7 +488,7 @@
         list.appendChild(li);
       });
 
-      const remaining = tasks.filter(t => !t.done).length;
+      const remaining = tasks.filter(t => t.category === currentCategory && !t.done).length;
       countEl.textContent = remaining + ' görev kaldı';
     }
 
@@ -458,6 +503,24 @@
         filterBtns.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         filter = btn.dataset.filter;
+        render();
+      });
+    });
+
+    // Liste başına placeholder metinleri
+    const placeholders = {
+      icra: 'Yeni icra dairesi işi ekle...',
+      mahkeme: 'Yeni mahkeme kalemi işi ekle...',
+      durusma: 'Yeni duruşma ekle...'
+    };
+
+    // Liste sekmeleri (İcra / Mahkeme / Duruşmalar)
+    listTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        listTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentCategory = tab.dataset.category;
+        input.placeholder = placeholders[currentCategory] || 'Yeni görev ekle...';
         render();
       });
     });
