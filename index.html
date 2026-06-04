@@ -182,14 +182,116 @@
     #clear-done:hover {
       text-decoration: underline;
     }
+
+    /* ---- Giriş / Kayıt ekranı ---- */
+    .auth-body {
+      padding: 24px;
+    }
+
+    .auth-body input {
+      width: 100%;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .auth-body input:focus {
+      border-color: #667eea;
+    }
+
+    .auth-body button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      background: #667eea;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-bottom: 10px;
+    }
+
+    .auth-body button:hover {
+      background: #5568d3;
+    }
+
+    .auth-body button.secondary {
+      background: #f0f0f0;
+      color: #555;
+    }
+
+    .auth-body button.secondary:hover {
+      background: #e4e4e4;
+    }
+
+    .auth-msg {
+      font-size: 0.88rem;
+      text-align: center;
+      min-height: 20px;
+      margin-top: 4px;
+    }
+
+    .auth-msg.error { color: #e57373; }
+    .auth-msg.success { color: #4caf50; }
+
+    .user-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 24px;
+      background: #f7f7fb;
+      border-bottom: 1px solid #eee;
+      font-size: 0.85rem;
+      color: #666;
+    }
+
+    #logout-btn {
+      border: none;
+      background: transparent;
+      color: #667eea;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    #logout-btn:hover { text-decoration: underline; }
+
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
-  <div class="app">
+  <!-- ===== GİRİŞ / KAYIT EKRANI ===== -->
+  <div class="app" id="auth-view">
+    <header>
+      <h1>📝 Yapılacaklar Listesi</h1>
+      <p>Devam etmek için giriş yap veya kaydol</p>
+    </header>
+    <div class="auth-body">
+      <input type="email" id="auth-email" placeholder="E-posta adresin" autocomplete="email">
+      <input type="password" id="auth-password" placeholder="Şifre (en az 6 karakter)" autocomplete="current-password">
+      <button id="login-btn">Giriş Yap</button>
+      <button id="signup-btn" class="secondary">Kaydol</button>
+      <div class="auth-msg" id="auth-msg"></div>
+    </div>
+  </div>
+
+  <!-- ===== UYGULAMA (giriş sonrası görünür) ===== -->
+  <div class="app hidden" id="app-view">
     <header>
       <h1>📝 Yapılacaklar Listesi</h1>
       <p>Görevlerini ekle, tamamla, sil</p>
     </header>
+
+    <div class="user-bar">
+      <span id="user-email">—</span>
+      <button id="logout-btn">Çıkış yap</button>
+    </div>
 
     <div class="input-row">
       <input type="text" id="task-input" placeholder="Yeni görev ekle..." maxlength="200">
@@ -228,6 +330,17 @@
     const countEl = document.getElementById('count');
     const clearDoneBtn = document.getElementById('clear-done');
     const filterBtns = document.querySelectorAll('.filter-btn');
+
+    // Giriş/kayıt ekranı elemanları
+    const authView = document.getElementById('auth-view');
+    const appView = document.getElementById('app-view');
+    const emailInput = document.getElementById('auth-email');
+    const passwordInput = document.getElementById('auth-password');
+    const loginBtn = document.getElementById('login-btn');
+    const signupBtn = document.getElementById('signup-btn');
+    const authMsg = document.getElementById('auth-msg');
+    const logoutBtn = document.getElementById('logout-btn');
+    const userEmail = document.getElementById('user-email');
 
     let tasks = [];
     let filter = 'all';
@@ -349,8 +462,79 @@
       });
     });
 
-    // Sayfa açılınca görevleri veritabanından yükle
-    load();
+    /* ============================================================
+       GİRİŞ / KAYIT (Supabase Auth)
+    ============================================================ */
+    function showMsg(text, type) {
+      authMsg.textContent = text;
+      authMsg.className = 'auth-msg ' + (type || '');
+    }
+
+    // Hata mesajlarını Türkçeleştir
+    function turkceHata(msg) {
+      if (!msg) return 'Bir hata oluştu.';
+      if (msg.includes('Invalid login credentials')) return 'E-posta veya şifre hatalı.';
+      if (msg.includes('User already registered')) return 'Bu e-posta zaten kayıtlı. Giriş yapmayı dene.';
+      if (msg.includes('Password should be at least')) return 'Şifre en az 6 karakter olmalı.';
+      if (msg.includes('Unable to validate email')) return 'Geçerli bir e-posta adresi gir.';
+      return msg;
+    }
+
+    async function signUp() {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      if (!email || !password) { showMsg('E-posta ve şifre gerekli.', 'error'); return; }
+
+      signupBtn.disabled = true;
+      const { error } = await db.auth.signUp({ email, password });
+      signupBtn.disabled = false;
+
+      if (error) { showMsg(turkceHata(error.message), 'error'); return; }
+      // E-posta onayı kapalı olduğu için kayıt = otomatik giriş
+      showMsg('Kayıt başarılı! Giriş yapılıyor...', 'success');
+    }
+
+    async function signIn() {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      if (!email || !password) { showMsg('E-posta ve şifre gerekli.', 'error'); return; }
+
+      loginBtn.disabled = true;
+      const { error } = await db.auth.signInWithPassword({ email, password });
+      loginBtn.disabled = false;
+
+      if (error) { showMsg(turkceHata(error.message), 'error'); return; }
+      showMsg('', '');
+    }
+
+    async function signOut() {
+      await db.auth.signOut();
+    }
+
+    // Oturum durumu değişince ekranı güncelle
+    db.auth.onAuthStateChange((event, session) => {
+      if (session && session.user) {
+        // Giriş yapıldı → uygulamayı göster
+        authView.classList.add('hidden');
+        appView.classList.remove('hidden');
+        userEmail.textContent = session.user.email;
+        emailInput.value = '';
+        passwordInput.value = '';
+        load();
+      } else {
+        // Çıkış yapıldı → giriş ekranını göster
+        appView.classList.add('hidden');
+        authView.classList.remove('hidden');
+        tasks = [];
+      }
+    });
+
+    loginBtn.addEventListener('click', signIn);
+    signupBtn.addEventListener('click', signUp);
+    logoutBtn.addEventListener('click', signOut);
+    passwordInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') signIn();
+    });
   </script>
 </body>
 </html>
