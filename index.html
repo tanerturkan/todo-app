@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yapılacaklar Listesi</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .app {
+      width: 100%;
+      max-width: 460px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+    }
+
+    header {
+      padding: 24px;
+      text-align: center;
+      border-bottom: 1px solid #eee;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      color: #333;
+    }
+
+    header p {
+      margin-top: 6px;
+      font-size: 0.9rem;
+      color: #888;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      padding: 20px 24px;
+    }
+
+    #task-input {
+      flex: 1;
+      padding: 12px 14px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    #task-input:focus {
+      border-color: #667eea;
+    }
+
+    #add-btn {
+      padding: 0 20px;
+      border: none;
+      border-radius: 10px;
+      background: #667eea;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #add-btn:hover {
+      background: #5568d3;
+    }
+
+    .filters {
+      display: flex;
+      gap: 8px;
+      padding: 0 24px 12px;
+    }
+
+    .filter-btn {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 8px;
+      background: #f0f0f0;
+      color: #555;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .filter-btn.active {
+      background: #667eea;
+      color: #fff;
+    }
+
+    ul#task-list {
+      list-style: none;
+      padding: 0 24px;
+      max-height: 360px;
+      overflow-y: auto;
+    }
+
+    .task {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .task input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      accent-color: #667eea;
+    }
+
+    .task span {
+      flex: 1;
+      font-size: 1rem;
+      color: #333;
+      word-break: break-word;
+    }
+
+    .task.done span {
+      text-decoration: line-through;
+      color: #aaa;
+    }
+
+    .delete-btn {
+      border: none;
+      background: transparent;
+      color: #e57373;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+
+    .delete-btn:hover {
+      background: #ffebee;
+    }
+
+    .empty {
+      text-align: center;
+      color: #bbb;
+      padding: 30px 0;
+      font-size: 0.95rem;
+    }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      font-size: 0.85rem;
+      color: #888;
+    }
+
+    #clear-done {
+      border: none;
+      background: transparent;
+      color: #667eea;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    #clear-done:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>📝 Yapılacaklar Listesi</h1>
+      <p>Görevlerini ekle, tamamla, sil</p>
+    </header>
+
+    <div class="input-row">
+      <input type="text" id="task-input" placeholder="Yeni görev ekle..." maxlength="200">
+      <button id="add-btn">Ekle</button>
+    </div>
+
+    <div class="filters">
+      <button class="filter-btn active" data-filter="all">Tümü</button>
+      <button class="filter-btn" data-filter="active">Aktif</button>
+      <button class="filter-btn" data-filter="done">Tamamlanan</button>
+    </div>
+
+    <ul id="task-list"></ul>
+
+    <footer>
+      <span id="count">0 görev</span>
+      <button id="clear-done">Tamamlananları temizle</button>
+    </footer>
+  </div>
+
+  <!-- Supabase kütüphanesi (internetten yüklenir) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    /* ============================================================
+       AYARLAR — Buraya KENDİ Supabase bilgilerini yaz!
+       (Aşağıdaki açıklamada nereden bulacağın anlatılıyor)
+    ============================================================ */
+    const SUPABASE_URL = 'https://wnpvaxhzmnsbsmeueoub.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducHZheGh6bW5zYnNtZXVlb3ViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1OTA4MjAsImV4cCI6MjA5NjE2NjgyMH0.tozHIUw-GSJJGs28dT59KtDo7sIOGsEPGgMD69dWP1A';
+
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const input = document.getElementById('task-input');
+    const addBtn = document.getElementById('add-btn');
+    const list = document.getElementById('task-list');
+    const countEl = document.getElementById('count');
+    const clearDoneBtn = document.getElementById('clear-done');
+    const filterBtns = document.querySelectorAll('.filter-btn');
+
+    let tasks = [];
+    let filter = 'all';
+
+    // Veritabanından tüm görevleri çeker
+    async function load() {
+      const { data, error } = await db
+        .from('tasks')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        alert('Görevler yüklenemedi: ' + error.message);
+        console.error(error);
+        return;
+      }
+      tasks = data;
+      render();
+    }
+
+    async function addTask() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      const { error } = await db.from('tasks').insert({ text, done: false });
+      if (error) {
+        alert('Görev eklenemedi: ' + error.message);
+        console.error(error);
+        return;
+      }
+      input.value = '';
+      await load();
+    }
+
+    async function toggleTask(id, done) {
+      const { error } = await db.from('tasks').update({ done }).eq('id', id);
+      if (error) {
+        alert('Güncellenemedi: ' + error.message);
+        console.error(error);
+        return;
+      }
+      await load();
+    }
+
+    async function deleteTask(id) {
+      const { error } = await db.from('tasks').delete().eq('id', id);
+      if (error) {
+        alert('Silinemedi: ' + error.message);
+        console.error(error);
+        return;
+      }
+      await load();
+    }
+
+    async function clearDone() {
+      const { error } = await db.from('tasks').delete().eq('done', true);
+      if (error) {
+        alert('Temizlenemedi: ' + error.message);
+        console.error(error);
+        return;
+      }
+      await load();
+    }
+
+    function render() {
+      list.innerHTML = '';
+
+      const visible = tasks.filter(t => {
+        if (filter === 'active') return !t.done;
+        if (filter === 'done') return t.done;
+        return true;
+      });
+
+      if (visible.length === 0) {
+        const li = document.createElement('li');
+        li.className = 'empty';
+        li.textContent = 'Görev yok 🎉';
+        list.appendChild(li);
+      }
+
+      visible.forEach(task => {
+        const li = document.createElement('li');
+        li.className = 'task' + (task.done ? ' done' : '');
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = task.done;
+        checkbox.addEventListener('change', () => toggleTask(task.id, checkbox.checked));
+
+        const span = document.createElement('span');
+        span.textContent = task.text;
+
+        const del = document.createElement('button');
+        del.className = 'delete-btn';
+        del.innerHTML = '&times;';
+        del.title = 'Sil';
+        del.addEventListener('click', () => deleteTask(task.id));
+
+        li.append(checkbox, span, del);
+        list.appendChild(li);
+      });
+
+      const remaining = tasks.filter(t => !t.done).length;
+      countEl.textContent = remaining + ' görev kaldı';
+    }
+
+    addBtn.addEventListener('click', addTask);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') addTask();
+    });
+    clearDoneBtn.addEventListener('click', clearDone);
+
+    filterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        filter = btn.dataset.filter;
+        render();
+      });
+    });
+
+    // Sayfa açılınca görevleri veritabanından yükle
+    load();
+  </script>
+</body>
+</html>
